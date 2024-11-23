@@ -1,6 +1,12 @@
 from flask import Flask, request, jsonify
+
+# Celery
 from celery import Celery
 import redis
+
+# Firebase
+import firebase_admin
+from firebase_admin import credentials, auth, firestore
 
 # Flask app setup
 app = Flask(__name__)
@@ -12,6 +18,14 @@ app.config['CELERY_RESULT_BACKEND'] = redis_url
 
 celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
 celery.conf.update(app.config)
+
+# Firebase setup
+cred = credentials.Certificate("firebase_service_account.json")
+firebase_admin.initialize_app(cred)
+
+# Firestore database instance (optional, if using Firestore)
+# - make sure this is after the initialize_app() is called
+db = firestore.client()
 
 
 @celery.task
@@ -60,6 +74,18 @@ def task_status(task_id):
         return jsonify({'status': 'Completed', 'result': task.result}), 200
     else:
         return jsonify({'status': 'Processing'}), 200
+
+
+@app.route('/get-event-data', methods=['GET'])
+def get_event_data():
+    try:
+        all_events = db.collection('events').stream()
+        res = []
+        for event in all_events:
+            res.append({event.id: event.to_dict()})
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 # Start application

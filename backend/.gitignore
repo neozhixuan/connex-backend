@@ -1,3 +1,4 @@
+# Flask defaults
 .idea/
 .vscode/
 .venv*/
@@ -8,3 +9,6 @@ dist/
 htmlcov/
 .tox/
 docs/_build/
+
+# Dont store firebase key
+/*.json
