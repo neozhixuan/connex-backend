@@ -1,10 +1,13 @@
-version: "3.9"
+# "version" is now obsolete
 
 services:
   flask-app:
     # Where to build from in our docker container
     build:
       context: ./backend
+    # This will automatically read variables from the .env file
+    env_file:
+      - /backend/.env
     # Name the container
     container_name: backend
     # Map the ports that we expose to our local port
@@ -19,6 +22,8 @@ services:
   celery-worker:
     build:
       context: ./backend
+    env_file:
+      - /backend/.env
     container_name: celery-worker
     command: celery -A app.celery worker --loglevel=info
     environment:
@@ -28,7 +33,23 @@ services:
       - redis
 
   redis:
-    image: "redis:latest"
+    image: "redis/redis-stack-server:latest"
     container_name: redis
     ports:
       - "6379:6379"
+
+  # scraper:
+  #   build:
+  #     context: ./backend/scraper
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 512m # Adjust this value (e.g., 1g for 1GB)
+  #   volumes:
+  #     - playwright_cache:/root/.cache/ms-playwright
+  #   working_dir: /app/scraper
+  #   depends_on:
+  #     - redis
+  #   network_mode: bridge
+# volumes:
+#   playwright_cache:

@@ -1,3 +1,5 @@
+from scraper.scraper import scrape_website
+from rag.rag import RAG
 from flask import Flask, request, jsonify
 
 # Celery
@@ -12,7 +14,7 @@ from firebase_admin import credentials, auth, firestore
 app = Flask(__name__)
 
 # Redis and Celery setup
-redis_url = 'redis://localhost:6379/0'
+redis_url = 'redis://redis:6379/0'
 app.config['CELERY_BROKER_URL'] = redis_url
 app.config['CELERY_RESULT_BACKEND'] = redis_url
 
@@ -27,18 +29,26 @@ firebase_admin.initialize_app(cred)
 # - make sure this is after the initialize_app() is called
 db = firestore.client()
 
+rag_instance = RAG()
+
 
 @celery.task
 def process_file_task(file_url):
     """
     Task on celery to process the file
     """
-    # Add your vectorization and RAG update logic here
     print(f"Processing file: {file_url}")
-    # Mock processing
-    import time
-    time.sleep(5)
-    return f"Processed file at {file_url}"
+
+    try:
+        # Scrape the site
+        site_text = scrape_website(file_url)
+        rag_instance.vectorize_and_store(site_text)
+        print(f"Processed file at {file_url}")
+
+        return {"status": "success"}
+
+    except Exception as e:
+        return {"status": "failure", "error": str(e)}
 
 
 @app.route('/', methods=['GET'])
@@ -60,6 +70,14 @@ def process_file():
     # Trigger Celery job
     task = process_file_task.delay(file_url)
     return jsonify({'message': 'File processing started', 'task_id': task.id})
+
+
+@app.route('/ask-question', methods=['POST'])
+def ask_question():
+    data = request.json
+    query = data.get('query')
+    rag_instance.get_similar_results(query)
+    return jsonify({"status": "succeed"})
 
 
 @app.route('/task-status/<task_id>', methods=['GET'])
