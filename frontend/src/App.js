@@ -133,7 +133,7 @@ function App() {
           </div>
         ) : (
           <div>
-            {taskID != "" && (
+            {taskID !== "" && (
               <div>
                 {isPolling ? "Polling " : "No longer polling"} task {taskID}.
                 Current status: {taskData && taskData["status"]}

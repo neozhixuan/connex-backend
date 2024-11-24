@@ -36,6 +36,15 @@ services:
     depends_on:
       - redis
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - flask-app
+
   redis:
     image: "redis/redis-stack-server:latest"
     container_name: redis
