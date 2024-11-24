@@ -18,6 +18,8 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
       - redis
+    volumes: # Bind mount for live code updates
+      - ./backend:/app
 
   celery-worker:
     build:
@@ -29,6 +31,8 @@ services:
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes: # Bind mount for live code updates
+      - ./backend:/app
     depends_on:
       - redis
 
@@ -37,19 +41,3 @@ services:
     container_name: redis
     ports:
       - "6379:6379"
-
-  # scraper:
-  #   build:
-  #     context: ./backend/scraper
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 512m # Adjust this value (e.g., 1g for 1GB)
-  #   volumes:
-  #     - playwright_cache:/root/.cache/ms-playwright
-  #   working_dir: /app/scraper
-  #   depends_on:
-  #     - redis
-  #   network_mode: bridge
-# volumes:
-#   playwright_cache:

@@ -7,13 +7,16 @@ def scrape_website(url):
     with sync_playwright() as p:
         print(p.chromium.executable_path)
 
+        # Launch the browser
         browser = p.chromium.launch(
-            executable_path="/root/.cache/ms-playwright/chromium-1148/chrome-linux/chrome", headless=True)
+            executable_path="/root/.cache/ms-playwright/chromium-1148/chrome-linux/chrome",
+            headless=True
+        )
         page = browser.new_page()
         page.goto(url)
 
         # Extract text content from the body
-        text = page.content()
+        text = page.locator("body").inner_text()
 
         # Free the RAM
         browser.close()

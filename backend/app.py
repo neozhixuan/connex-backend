@@ -76,8 +76,9 @@ def process_file():
 def ask_question():
     data = request.json
     query = data.get('query')
-    rag_instance.get_similar_results(query)
-    return jsonify({"status": "succeed"})
+    res = rag_instance.get_similar_results(query)
+    ans = rag_instance.get_rag_response(query)
+    return jsonify({"answer": str(ans), "similar_results": res})
 
 
 @app.route('/task-status/<task_id>', methods=['GET'])
