@@ -1,6 +1,7 @@
 from scraper.scraper import scrape_website
 from rag.rag import RAG
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 # Celery
 from celery import Celery
@@ -12,6 +13,9 @@ from firebase_admin import credentials, auth, firestore
 
 # Flask app setup
 app = Flask(__name__)
+
+# Enable CORS for all routes and origins (TODO: update for prod)
+CORS(app)
 
 # Redis and Celery setup
 redis_url = 'redis://redis:6379/0'
