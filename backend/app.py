@@ -1,15 +1,24 @@
-from scraper.scraper import scrape_website
+from firebase_admin import credentials, auth, firestore
+import firebase_admin
+from scraper.scraper import scrape_website, scrape_anchors
 from rag.rag import RAG
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import logging
 
 # Celery
 from celery import Celery
 import redis
 
+# Configure Celery logging
+logger = logging.getLogger("celery")
+handler = logging.StreamHandler()
+formatter = logging.Formatter("[%(asctime)s: %(levelname)s] - %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+
 # Firebase
-import firebase_admin
-from firebase_admin import credentials, auth, firestore
 
 # Flask app setup
 app = Flask(__name__)
@@ -36,6 +45,7 @@ db = firestore.client()
 rag_instance = RAG()
 
 
+# URL PROCESSING
 @celery.task
 def process_file_task(file_url):
     """
@@ -46,18 +56,13 @@ def process_file_task(file_url):
     try:
         # Scrape the site
         site_text = scrape_website(file_url)
-        rag_instance.vectorize_and_store(site_text)
+        res = rag_instance.vectorize_and_store(site_text, "sites", 1000)
         print(f"Processed file at {file_url}")
 
-        return {"status": "success"}
+        return res
 
     except Exception as e:
         return {"status": "failure", "error": str(e)}
-
-
-@app.route('/', methods=['GET'])
-def home_page():
-    return jsonify({"message": "landing page"})
 
 
 @app.route('/process-file', methods=['POST'])
@@ -80,9 +85,60 @@ def process_file():
 def ask_question():
     data = request.json
     query = data.get('query')
-    res = rag_instance.get_similar_results(query)
-    ans = rag_instance.get_rag_response(query)
+    res = rag_instance.get_similar_results(query, "sites")
+    ans = rag_instance.get_rag_response(query, "sites")
     return jsonify({"answer": str(ans), "similar_results": res})
+
+
+# JOB SITE SCRAPING
+@celery.task
+def process_job_site_task(url):
+    """
+    Task on celery to process the job site
+    """
+    print(f"Processing url: {url}")
+    all_urls = scrape_anchors(url)
+
+    # Scrape the site
+    for site_url in all_urls:
+        if "href" not in site_url:
+            print("Does not have href")
+            continue
+        logger.info("Scraping website..." + site_url["href"])
+        site_text = scrape_website(site_url["href"])
+        res = rag_instance.vectorize_and_store(
+            site_text, "jobs", 1000000, site_url["text"])
+        print(f"Processed website")
+    return res
+
+
+@app.route("/resume-match", methods=["POST"])
+def resume_match():
+    data = request.json
+    resume_text = data.get('resume_text')
+    res = rag_instance.get_similar_results(resume_text, "jobs")
+    return jsonify(res)
+
+
+@app.route('/scrape-jobs', methods=['POST'])
+def process_recruitment_site():
+    data = request.json
+    url = data.get('url')
+
+    if not url:
+        return jsonify({'error': 'No file URL provided'}), 400
+
+    # Trigger Celery job
+    task = process_job_site_task.delay(url)
+    return jsonify({'message': 'File processing started', 'task_id': task.id})
+
+
+# HOME
+@app.route('/', methods=['GET'])
+def home_page():
+    return jsonify({"message": "landing page"})
+
+# CELERY CHECK
 
 
 @app.route('/task-status/<task_id>', methods=['GET'])
@@ -98,6 +154,8 @@ def task_status(task_id):
     else:
         return jsonify({'status': 'Processing'}), 200
 
+# EVENTS FUNCTION
+
 
 @app.route('/get-event-data', methods=['GET'])
 def get_event_data():
@@ -109,6 +167,17 @@ def get_event_data():
         return jsonify(res)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# CLEAR REDIS
+
+
+@app.route('/clear-db', methods=['POST'])
+def clear_db():
+    data = request.json
+    index_name = data.get('index_name')
+
+    res = rag_instance.clear_keys(index_name)
+    return res
 
 
 # Start application

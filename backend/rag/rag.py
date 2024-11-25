@@ -35,44 +35,92 @@ class RAG:
         self.redis_conn = redis.Redis(
             host=self.redis_host, port=self.redis_port, password=self.redis_password)
 
-        # Initialize vector store
-        self.vector_store = Redis(index_name="test", embedding=self.embeddings,
-                                  redis_url=f"redis://{self.redis_host}:{self.redis_port}")
-
-        # Initialize text splitter
-        self.text_splitter = CharacterTextSplitter(
-            chunk_size=1000, chunk_overlap=200)
-
-    def vectorize_and_store(self, text):
+    def vectorize_and_store(self, text, index_name, chunk_size, metadata=None):
         try:
+            print("Starting to vectorize text...")
+
+            # Initialize text splitter
+            text_splitter = CharacterTextSplitter(
+                chunk_size=chunk_size, chunk_overlap=200)
+
             # Split text into chunks
-            chunks = self.text_splitter.split_text(text)
+            chunks = text_splitter.split_text(text)
+            print(f"Text split into {len(chunks)} chunks")
+
+            # Initialize Redis VectorStore
+            vector_store = Redis(
+                index_name=index_name,
+                embedding=self.embeddings,
+                redis_url=f"redis://{self.redis_host}:{self.redis_port}"
+            )
+            print(
+                f"Redis VectorStore initialized with index name: '{index_name}'")
+            print(f"VectorStore key prefix: '{vector_store.key_prefix}'")
+
+            print("Storing chunks in Redis...")
 
             # Store chunks in Redis VectorStore
-            for chunk in chunks:
-                self.vector_store.add_texts([chunk])
+            for i, chunk in enumerate(chunks):
+                # Preview chunk content
+                print(f"Processing chunk {i+1}/{len(chunks)}: {chunk[:50]}...")
+                if metadata:
+                    # Customize this as needed
+                    myMetadata = {"source": metadata}
+                    print(f"Storing with metadata: {myMetadata}")
+                    vector_store.add_texts([chunk], metadatas=[myMetadata])
+                else:
+                    print("Storing without metadata")
+                    vector_store.add_texts([chunk])
+                print(f"Chunk {i+1} stored")
 
-            print(f"Vectorized {len(chunks)} chunks and stored in Redis.")
+            print(
+                f"Successfully vectorized {len(chunks)} chunks and stored in Redis.")
+
+            # Debug: Verify keys in Redis after storing
+            search_pattern = f"{vector_store.key_prefix}:*"
+            print(
+                f"Using search pattern: '{search_pattern}' to fetch keys from Redis")
+
+            stored_keys = self.redis_conn.keys(search_pattern)
+            if stored_keys:
+                print(
+                    f"Keys in Redis after storage: {[key.decode('utf-8') for key in stored_keys]}")
+            else:
+                print(
+                    f"No keys found in Redis for pattern '{search_pattern}' after storage.")
 
             return {"status": "success"}
+
         except Exception as e:
+            print(f"Error during vectorization or storage: {e}")
             return {"status": "failure", "error": str(e)}
 
-    def get_similar_results(self, query):
+    def get_similar_results(self, query, index_name):
         # Query the vector store for similar text
         # - returns results in order, from highest similarity
-        results = self.vector_store.similarity_search(query, k=self.numResults)
+        vector_store = Redis(index_name=index_name, embedding=self.embeddings,
+                             redis_url=f"redis://{self.redis_host}:{self.redis_port}")
+
+        results = vector_store.similarity_search(query, k=self.numResults)
 
         res = []
         for i, result in enumerate(results):
-            res.append({i: result.page_content})
+            if "metadata" in result:
+                print("Metadata found")
+                res.append(
+                    {i: {"page_content": result.page_content, "metadata": result.metadata["source"]}})
+            else:
+                res.append({i: {"page_content": result.page_content}})
 
         return res
 
-    def get_rag_response(self, query):
+    def get_rag_response(self, query, index_name):
         # 1. Connect to Redis VectorStore
         # 2. Initialize the retriever
-        retriever = self.vector_store.as_retriever(
+        vector_store = Redis(index_name=index_name, embedding=self.embeddings,
+                             redis_url=f"redis://{self.redis_host}:{self.redis_port}")
+
+        retriever = vector_store.as_retriever(
             search_type="similarity", search_kwargs={"k": self.numResults})
 
         # 3. Define the language model
@@ -102,3 +150,29 @@ class RAG:
         print(result)
         print(type(result))
         return result["answer"]
+
+    def clear_keys(self, index_name):
+        try:
+            # Define the prefix used for keys
+            key_prefix = f"doc:{index_name}:*"
+
+            # Match keys with the proper prefix
+            keys = self.redis_conn.keys(key_prefix)
+            print(f"Keys matching pattern '{key_prefix}': {keys}")
+
+            if not keys:
+                print(f"No keys found for index '{index_name}'")
+                return {"status": "success", "message": "No keys to clear"}
+
+            # Decode keys if necessary
+            keys_to_delete = [key.decode(
+                'utf-8') if isinstance(key, bytes) else key for key in keys]
+            print(f"Decoded keys: {keys_to_delete}")
+
+            # Delete the keys
+            self.redis_conn.delete(*keys_to_delete)
+            print(f"Cleared all keys for index '{index_name}'")
+            return {"status": "success", "message": f"Cleared all keys for index '{index_name}'"}
+        except Exception as e:
+            print(f"Error while clearing keys: {e}")
+            return {"status": "failure", "error": str(e)}
