@@ -1,5 +1,9 @@
 # Connex
 
+Connex aims to allow companies to connect with undergraduates/graduates, by providing services like matching their resume to available jobs, and to have a contextualised chatbot to answer any queries.
+
+By providing a UI for companies to scrape their job portal and also other sites relevant to the company, we can provide applicants with information to stay updated with our company.
+
 This project consists of two main services: the **Frontend** and the **Backend**, orchestrated using Docker Compose. Below is a description of each service and how to set up and run the project.
 
 [![Demo Video](https://img.youtube.com/vi/4-DZgDyWgyY/0.jpg)](https://www.youtube.com/watch?v=4-DZgDyWgyY)
