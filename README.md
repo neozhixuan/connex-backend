@@ -2,6 +2,8 @@
 
 This project consists of two main services: the **Frontend** and the **Backend**, orchestrated using Docker Compose. Below is a description of each service and how to set up and run the project.
 
+[![Demo Video](https://img.youtube.com/vi/4-DZgDyWgyY/0.jpg)](https://www.youtube.com/watch?v=4-DZgDyWgyY)
+
 ![image](https://github.com/user-attachments/assets/da9fe1e6-4776-4da7-993a-67b846f60f20)
 
 ![image](https://github.com/user-attachments/assets/21d63177-7e60-494e-ad98-1b0d9cd9c9a1)
