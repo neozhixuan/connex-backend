@@ -73,6 +73,12 @@ project/
 │ └── app/
 └── README.md
 ```
+### Setup
+```
+cd backend
+touch .env
+```
+Add your OPENAI_API_KEY.
 
 ### Docker Compose Configuration
 The `docker-compose.yml` defines:
